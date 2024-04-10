@@ -1,48 +1,48 @@
-#include "crow.h"
+#include <pistache/endpoint.h>
+#include <pistache/http.h>
 #include <vector>
-#include <string>
+#include <cpr/cpr.h>
+
+using namespace Pistache;
+using namespace std;
 
 struct User {
-    std::string id;
-    std::string name;
-    std::string email;
+    int id;
+    string name;
+    string email;
 };
 
-std::vector<User> users;
+vector<User> users;
+
+void handleGetUser(const Rest::Request& request, Http::ResponseWriter response) {
+    int userId = stoi(request.param(":id").as<string>());
+    auto it = find_if(users.begin(), users.end(), [&](const User& user) { return user.id == userId; });
+
+    if (it != users.end()) {
+        response.send(Http::Code::Ok, *it);
+    } else {
+        response.send(Http::Code::Not_Found, "User not found");
+    }
+}
+
+void handleCreateUser(const Rest::Request& request, Http::ResponseWriter response) {
+    User user;
+    request.body().bind(&user);
+    user.id = users.size() + 1;
+    users.push_back(user);
+    response.send(Http::Code::Created, user);
+}
 
 int main() {
-    crow::SimpleApp app;
+    Address addr(Ipv4::any(), Port(9080));
+    auto server = std::make_shared<Http::Endpoint>(addr);
 
-    CROW_ROUTE(app, "/users")
-        ([](const crow::request& req) {
-        if (req.method() == "POST"_method) {
-            auto x = crow::json::load(req.body);
-            User user;
-            user.id = x["id"].s();
-            user.name = x["name"].s();
-            user.email = x["email"].s();
-            users.push_back(user);
-            return crow::response(crow::status::CREATED, crow::json::wvalue(user));
-        }
-        else {
-            std::vector<crow::json::wvalue> userList;
-            for (const auto& user : users) {
-                userList.push_back(crow::json::wvalue(user));
-            }
-            return crow::response(crow::json::wvalue(userList));
-        }
-            });
+    Rest::Router router;
+    Rest::Routes::Get(router, "/users/:id", &handleGetUser);
+    Rest::Routes::Post(router, "/users", &handleCreateUser);
 
-    CROW_ROUTE(app, "/users/<string>")
-        ([](const crow::request& req, std::string userId) {
-        for (const auto& user : users) {
-            if (user.id == userId) {
-                return crow::response(crow::json::wvalue(user));
-            }
-        }
-        return crow::response(crow::status::NOT_FOUND, "User not found");
-            });
+    server->init(router);
+    server->serveThreaded();
 
-    app.port(3000).run();
     return 0;
 }
