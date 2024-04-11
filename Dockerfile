@@ -11,7 +11,7 @@ WORKDIR /app
 RUN g++ -o myapp main.cpp
 
 # Експонуємо порт 8080
-EXPOSE 15672
+EXPOSE 5672
 
 # Команда, яка виконується при запуску контейнера
 CMD ["./myapp"]
